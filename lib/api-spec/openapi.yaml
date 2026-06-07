@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: World Capo API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: flags
+    description: Flag wall operations
+  - name: payments
+    description: Payment operations
+  - name: admin
+    description: Admin dashboard operations
+  - name: gdpr
+    description: GDPR compliance operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +31,328 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /flags:
+    get:
+      operationId: listFlags
+      tags: [flags]
+      summary: List all placed flags on the wall
+      responses:
+        "200":
+          description: List of flags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Flag"
+
+  /flags/counts:
+    get:
+      operationId: getFlagCounts
+      tags: [flags]
+      summary: Get flag counts per team
+      responses:
+        "200":
+          description: Flag counts keyed by teamId
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamFlagCount"
+
+  /payments/intent:
+    post:
+      operationId: createPaymentIntent
+      tags: [payments]
+      summary: Create a Stripe PaymentIntent for flag placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentIntentInput"
+      responses:
+        "200":
+          description: PaymentIntent created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentIntentResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /payments/webhook:
+    post:
+      operationId: stripeWebhook
+      tags: [payments]
+      summary: Stripe webhook endpoint
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAck"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/payments:
+    get:
+      operationId: listAdminPayments
+      tags: [admin]
+      summary: List recent payments for admin dashboard
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated payment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPaymentList"
+
+  /admin/team-breakdown:
+    get:
+      operationId: getTeamBreakdown
+      tags: [admin]
+      summary: Revenue and flag count breakdown by team
+      responses:
+        "200":
+          description: Per-team breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamBreakdown"
+
+  /gdpr/consent:
+    post:
+      operationId: recordConsent
+      tags: [gdpr]
+      summary: Record user cookie/analytics consent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentInput"
+      responses:
+        "200":
+          description: Consent recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentResult"
+
+  /gdpr/erasure:
+    post:
+      operationId: requestErasure
+      tags: [gdpr]
+      summary: GDPR right-to-erasure request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErasureInput"
+      responses:
+        "200":
+          description: Erasure request acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErasureResult"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    Flag:
+      type: object
+      required: [id, teamId, x, y, createdAt]
+      properties:
+        id:
+          type: integer
+        teamId:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        createdAt:
+          type: string
+
+    TeamFlagCount:
+      type: object
+      required: [teamId, count]
+      properties:
+        teamId:
+          type: string
+        count:
+          type: integer
+
+    PaymentIntentInput:
+      type: object
+      required: [teamId, x, y]
+      properties:
+        teamId:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        email:
+          type: ["string", "null"]
+
+    PaymentIntentResult:
+      type: object
+      required: [clientSecret, paymentIntentId]
+      properties:
+        clientSecret:
+          type: string
+        paymentIntentId:
+          type: string
+
+    WebhookAck:
+      type: object
+      required: [received]
+      properties:
+        received:
+          type: boolean
+
+    AdminStats:
+      type: object
+      required: [totalRevenue, totalFlags, totalPayments, successRate, revenueToday, flagsToday]
+      properties:
+        totalRevenue:
+          type: number
+        totalFlags:
+          type: integer
+        totalPayments:
+          type: integer
+        successRate:
+          type: number
+        revenueToday:
+          type: number
+        flagsToday:
+          type: integer
+
+    AdminPayment:
+      type: object
+      required: [id, stripePaymentIntentId, amountCents, currency, status, teamId, createdAt]
+      properties:
+        id:
+          type: integer
+        stripePaymentIntentId:
+          type: string
+        amountCents:
+          type: integer
+        currency:
+          type: string
+        status:
+          type: string
+        teamId:
+          type: string
+        createdAt:
+          type: string
+
+    AdminPaymentList:
+      type: object
+      required: [payments, total, page, limit]
+      properties:
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPayment"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    TeamBreakdown:
+      type: object
+      required: [teamId, flagCount, revenue]
+      properties:
+        teamId:
+          type: string
+        flagCount:
+          type: integer
+        revenue:
+          type: number
+
+    ConsentInput:
+      type: object
+      required: [sessionId, analytics, marketing]
+      properties:
+        sessionId:
+          type: string
+        analytics:
+          type: boolean
+        marketing:
+          type: boolean
+
+    ConsentResult:
+      type: object
+      required: [saved]
+      properties:
+        saved:
+          type: boolean
+
+    ErasureInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+
+    ErasureResult:
+      type: object
+      required: [acknowledged, message]
+      properties:
+        acknowledged:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

@@ -1,0 +1,61 @@
+World Capo - Production & Deployment Blueprint
+To deploy this application securely, process real payments (Stripe/Apple Pay), and handle World Cup traffic, you must shift from a "Frontend-Only" prototype to a Full-Stack Architecture.
+
+1. The Database (Firebase Firestore)
+Right now, the app uses a temporary demo database. You need your own live Firebase project.
+
+What is needed:
+Create a Firebase Project: Go to the Firebase Console, create a project, and register a web app to get your specific firebaseConfig keys.
+Replace the Config: In App.jsx, you will replace the dynamic __firebase_config with your actual keys:
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "your-app.firebaseapp.com",
+  projectId: "your-app",
+  // ...etc
+};
+Security Rules (CRITICAL): Right now, anyone can write to the database. In production, you must write Firestore Security Rules that block all frontend writes.
+Rule: allow read: if true; (Everyone can see the wall).
+Rule: allow write: if false; (Nobody can write directly from the browser).
+How do flags get added? Through your secure backend via a Stripe Webhook (see below).
+2. Real Payments (Stripe + Apple Pay)
+To accept real money securely, you need three components: the Frontend (React), a Backend (Node.js/Firebase Cloud Functions), and Stripe.
+
+Architecture Flow:
+Frontend: User clicks "Hang Flag" and selects a location.
+Backend: Frontend asks your secure backend to create a Stripe PaymentIntent for €0.70.
+Frontend: Stripe's secure UI (Payment Element) appears. Apple Pay / Google Pay will automatically show up in this element if the user is on a compatible device (iPhone, Safari, Android).
+User Pays: The user authenticates with FaceID/TouchID or enters a card.
+Stripe Webhook (Backend): Stripe sends a secure message (Webhook) to your backend saying, "Payment Successful."
+Backend Writes to DB: Your backend uses the Firebase Admin SDK to write the flag's X/Y coordinates to Firestore.
+Frontend Updates: Because Firestore is real-time, the flag instantly appears on the user's screen (and everyone else's screen).
+Libraries Needed:
+Frontend: @stripe/stripe-js and @stripe/react-stripe-js
+Backend: stripe (Node.js SDK) and firebase-admin
+3. Scalability (How many clients can it handle?)
+Firebase and Stripe are built for massive scale, but you need to be aware of how it scales and the costs.
+
+System Limits:
+Concurrent Users: Firebase Firestore supports 1 Million concurrent connections per database.
+Write Speed: Firestore can handle 10,000 writes per second. (That's 10,000 flags being bought every second).
+Stripe: Can comfortably handle thousands of transactions per second.
+The Bottleneck: Firestore Read Costs
+Firestore charges you per "Document Read". If you have 10,000 flags on the wall, and 1 user loads the page, that is 10,000 reads. If 100,000 users load the page, that is 1 Billion reads (which costs about $300-$600 USD).
+
+How to solve this for massive traffic: Before launching to thousands of users, you will need a backend script that takes all 10,000 flags and bundles them into a single JSON file or a single document. That way, when a user loads the page, they download 1 document instead of 10,000, saving you thousands of euros.
+
+4. Testing Strategy (Security & Payments)
+Before going live, you must rigorously test the workflow.
+
+A. Testing Payments (Stripe Test Mode)
+Stripe provides a "Test Mode" toggle in their dashboard. While in test mode, real money is never charged.
+
+Card Testing: Stripe provides test card numbers. Using 4242 4242 4242 4242 will always trigger a successful payment.
+Apple Pay Testing: You must register your domain in the Stripe Dashboard under Apple Pay settings. To test it, you must use a real Apple device logged into an iCloud account that has been added to your Apple Developer account as a "Sandbox Tester."
+B. Testing Security (Firebase Emulators)
+Use the Firebase Local Emulator Suite. This runs a fake version of your database on your computer.
+
+Write automated tests using a framework like Jest or Mocha.
+Attempt to write fake flags to the database without paying. Your security rules should block this and throw a permission-denied error.
+C. Testing Flag Placement (End-to-End)
+Use a tool like Cypress or Playwright. You can write a script that opens a headless browser, clicks a team, clicks coordinates (X: 500, Y: 500), enters the Stripe test card, and verifies that the flag emoji appears exactly at those coordinates on the screen.
+
