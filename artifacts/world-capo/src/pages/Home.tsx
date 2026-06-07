@@ -75,9 +75,6 @@ export default function Home() {
               </span>
               <span className="text-xs font-bold text-green-400 uppercase tracking-widest">Live</span>
             </div>
-            <Link href="/admin" className="text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">
-              Admin
-            </Link>
           </div>
         </div>
 
