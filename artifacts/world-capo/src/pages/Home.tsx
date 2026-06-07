@@ -1,18 +1,16 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useListFlags, useGetFlagCounts } from "@workspace/api-client-react";
 import { TEAMS } from "@/lib/teams";
-import { Header } from "@/components/Header";
 import { CookieConsent } from "@/components/CookieConsent";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { Crown } from "lucide-react";
 
 export default function Home() {
   const { data: flags, isLoading: loadingFlags } = useListFlags();
-  const { data: counts, isLoading: loadingCounts } = useGetFlagCounts();
+  const { data: counts } = useGetFlagCounts();
   const { toast } = useToast();
 
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -20,14 +18,9 @@ export default function Home() {
   const dragStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    // Show success toast if returning from payment
     const pendingPayment = sessionStorage.getItem("pending_flag_payment");
     if (pendingPayment) {
-      toast({
-        title: "Success",
-        description: "Your flag is live on the wall!",
-        variant: "default",
-      });
+      toast({ title: "🎉 Flag placed!", description: "Your flag is now live on the global wall!" });
       sessionStorage.removeItem("pending_flag_payment");
     }
   }, [toast]);
@@ -39,117 +32,180 @@ export default function Home() {
     }).sort((a, b) => b.totalCount - a.totalCount);
   }, [counts]);
 
+  const totalPlaced = useMemo(() => teamsWithCounts.reduce((s, t) => s + t.totalCount, 0), [teamsWithCounts]);
+  const leader = teamsWithCounts[0];
+
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
   };
-
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    setPan({
-      x: e.clientX - dragStart.current.x,
-      y: e.clientY - dragStart.current.y,
-    });
+    setPan({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
   };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans overflow-hidden">
-      <Header />
-      
-      <main className="flex-1 pt-16 flex relative h-[calc(100vh-64px)]">
-        {/* Leaderboard Sidebar */}
-        <div className="w-80 border-r border-border/50 bg-card/50 backdrop-blur-sm z-10 flex flex-col">
-          <div className="p-4 border-b border-border/50">
-            <h2 className="text-xl font-bold uppercase tracking-wider">Top Nations</h2>
-            <p className="text-xs text-muted-foreground">Live flag counts</p>
+    <div className="min-h-screen bg-background text-foreground font-sans">
+
+      {/* ── TOP HEADER ─────────────────────────────────────────── */}
+      <header className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-end justify-between">
+          <div>
+            <h1 className="text-5xl font-black uppercase tracking-tight leading-none text-primary" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+              World Capo
+            </h1>
+            <p className="text-xs text-muted-foreground uppercase tracking-[0.2em] mt-0.5">
+              FIFA World Cup 2026 · Fan Wall
+            </p>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
-            {loadingCounts ? (
-              Array(10).fill(0).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-lg" />
-              ))
-            ) : (
-              teamsWithCounts.map((team, index) => (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  key={team.id}
-                >
-                  <Card className="bg-background/50 border-border/50 hover:border-primary/50 transition-colors group">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{team.flag}</span>
-                        <div>
-                          <div className="font-bold text-sm uppercase tracking-wide group-hover:text-primary transition-colors">{team.name}</div>
-                          <div className="text-xs text-muted-foreground">{team.totalCount.toLocaleString()} flags</div>
-                        </div>
-                      </div>
-                      <Link href={`/checkout/${team.id}`} className="shrink-0">
-                        <Button size="sm" variant="secondary" className="text-xs h-7 uppercase tracking-wider font-bold">
-                          Hang
-                        </Button>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))
-            )}
+          <div className="flex items-center gap-8">
+            <div className="text-right">
+              <div className="text-2xl font-black text-primary tabular-nums">{totalPlaced.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Total Placed</div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-black text-foreground">48</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Nations</div>
+            </div>
+            <div className="flex items-center gap-2 pl-6 border-l border-border/50">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <span className="text-xs font-bold text-green-400 uppercase tracking-widest">Live</span>
+            </div>
+            <Link href="/admin" className="text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">
+              Admin
+            </Link>
           </div>
         </div>
 
-        {/* Interactive Wall */}
-        <div 
-          className="flex-1 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-card via-background to-background cursor-grab active:cursor-grabbing"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          {/* Grid background */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', backgroundSize: '50px 50px' }} />
-          
-          <div 
-            className="absolute top-1/2 left-1/2 w-[2500px] h-[1500px] bg-black/20 border border-white/5 shadow-2xl"
-            style={{ 
-              transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))`
-            }}
-          >
-            {loadingFlags ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-primary font-bold animate-pulse uppercase tracking-widest">Loading Wall...</span>
+        {/* Announcement bar */}
+        <div className="bg-[#1a2a1a] border-t border-green-900/50 px-6 py-2 flex items-center gap-4 text-sm">
+          <span className="bg-green-900/60 border border-green-700/50 text-green-300 rounded px-3 py-0.5 text-xs font-bold uppercase tracking-wider shrink-0 flex items-center gap-2">
+            ⚽ USA · Canada · Mexico 2026
+          </span>
+          <span className="text-muted-foreground">Hang your nation's flag on the world's biggest fan board</span>
+          <span className="text-primary font-bold ml-auto shrink-0">only €0.70 per flag</span>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+
+        {/* ── CURRENT LEADER ─────────────────────────────────────── */}
+        {leader && (
+          <div className="bg-card/60 border border-border/50 rounded-xl p-5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Crown className="w-8 h-8 text-primary fill-primary/30" />
+              <span className="text-4xl">{leader.flag}</span>
+              <div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Current Leader</div>
+                <div className="text-2xl font-black uppercase tracking-wide">{leader.name}</div>
               </div>
-            ) : (
-              flags?.map(flag => {
-                const team = TEAMS.find(t => t.id === flag.teamId);
-                if (!team) return null;
-                return (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    key={flag.id}
-                    className="absolute text-2xl filter drop-shadow-md"
-                    style={{ left: flag.x, top: flag.y }}
-                  >
-                    {team.flag}
-                  </motion.div>
-                );
-              })
-            )}
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-black text-primary tabular-nums">{leader.totalCount.toLocaleString()} flags</div>
+            </div>
           </div>
-          
-          <div className="absolute bottom-6 right-6 pointer-events-none">
-            <div className="bg-black/50 backdrop-blur px-4 py-2 rounded-full border border-white/10 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Drag to explore
+        )}
+
+        {/* ── THE GLOBAL WALL ─────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-black uppercase tracking-wider">The Global Wall</h2>
+            <span className="text-xs text-muted-foreground">Drag to explore · Click a nation below to hang your flag</span>
+          </div>
+
+          <div
+            className="relative overflow-hidden rounded-xl border border-border/40 bg-[#0a0f0a] cursor-grab active:cursor-grabbing"
+            style={{ height: 480 }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            {/* Grid background */}
+            <div
+              className="absolute inset-0 opacity-10 pointer-events-none"
+              style={{ backgroundImage: 'linear-gradient(#2a4a2a 1px, transparent 1px), linear-gradient(90deg, #2a4a2a 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+            />
+
+            {/* 2000×1500 canvas */}
+            <div
+              className="absolute bg-black/20 border border-white/5 shadow-2xl"
+              style={{
+                width: 2000,
+                height: 1500,
+                top: '50%',
+                left: '50%',
+                transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))`,
+              }}
+            >
+              {loadingFlags ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Loading Wall...</span>
+                </div>
+              ) : flags && flags.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-muted-foreground text-sm uppercase tracking-widest">Select a team below to place a flag</span>
+                </div>
+              ) : (
+                flags?.map(flag => {
+                  const team = TEAMS.find(t => t.id === flag.teamId);
+                  if (!team) return null;
+                  return (
+                    <motion.div
+                      initial={{ scale: 0, rotate: -10 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      key={flag.id}
+                      className="absolute text-2xl select-none"
+                      style={{ left: flag.x, top: flag.y, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))' }}
+                      title={team.name}
+                    >
+                      {team.flag}
+                    </motion.div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="absolute bottom-4 right-4 pointer-events-none">
+              <div className="bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 text-xs text-muted-foreground uppercase tracking-widest">
+                Drag to explore
+              </div>
             </div>
           </div>
         </div>
+
+        {/* ── NATIONS LEADERBOARD ─────────────────────────────────── */}
+        <div>
+          <h2 className="text-xl font-black uppercase tracking-wider mb-4">Nations</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {teamsWithCounts.map((team, index) => (
+              <motion.div
+                key={team.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.02 }}
+              >
+                <Link href={`/checkout/${team.id}`}>
+                  <div className="bg-card/60 border border-border/50 hover:border-primary/60 hover:bg-card transition-all rounded-xl p-4 flex flex-col items-center gap-2 text-center group cursor-pointer">
+                    <span className="text-3xl">{team.flag}</span>
+                    <div className="font-bold text-xs uppercase tracking-wide group-hover:text-primary transition-colors">{team.name}</div>
+                    <div className="text-xs text-muted-foreground tabular-nums">{team.totalCount.toLocaleString()}</div>
+                    <Button size="sm" className="h-6 text-[10px] w-full uppercase tracking-wider font-bold">
+                      Hang
+                    </Button>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
       </main>
-      
+
       <CookieConsent />
     </div>
   );
