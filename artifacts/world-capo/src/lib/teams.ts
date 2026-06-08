@@ -48,32 +48,3 @@ export const TEAMS = [
   { id: "URY", name: "Uruguay",      flag: "🇺🇾", group: "G", baseCount: 0 },
   { id: "USA", name: "United States",flag: "🇺🇸", group: "H", baseCount: 0 },
 ];
-
-// Stable grid positions for each team's pin on the 2000×1500 canvas
-// 8 cols × 6 rows, with padding so pins don't crowd the edges
-const COLS = 8;
-const ROWS = 6;
-const PAD_X = 140;
-const PAD_Y = 130;
-const STEP_X = (2000 - PAD_X * 2) / (COLS - 1);
-const STEP_Y = (1500 - PAD_Y * 2) / (ROWS - 1);
-
-// Small jitter seeded per-team so pins don't sit on a rigid grid
-function jitter(seed: number, range: number) {
-  const x = Math.sin(seed * 9301 + 49297) * 233280;
-  return ((x - Math.floor(x)) - 0.5) * range;
-}
-
-export const TEAM_PINS: Record<string, { x: number; y: number }> = Object.fromEntries(
-  TEAMS.map((t, i) => {
-    const col = i % COLS;
-    const row = Math.floor(i / COLS);
-    return [
-      t.id,
-      {
-        x: Math.round(PAD_X + col * STEP_X + jitter(i * 3 + 1, 60)),
-        y: Math.round(PAD_Y + row * STEP_Y + jitter(i * 3 + 2, 50)),
-      },
-    ];
-  })
-);

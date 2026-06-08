@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useListFlags, useGetFlagCounts } from "@workspace/api-client-react";
-import { TEAMS, TEAM_PINS } from "@/lib/teams";
+import { TEAMS } from "@/lib/teams";
 import { CookieConsent } from "@/components/CookieConsent";
+import { FlagImg } from "@/components/FlagImg";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -28,19 +29,12 @@ export default function Home() {
   const teamsWithCounts = useMemo(() => {
     return TEAMS.map(team => {
       const serverCount = counts?.find(c => c.teamId === team.id)?.count || 0;
-      return { ...team, totalCount: team.baseCount + serverCount };
+      return { ...team, totalCount: serverCount };
     }).sort((a, b) => b.totalCount - a.totalCount);
   }, [counts]);
 
   const totalPlaced = useMemo(() => teamsWithCounts.reduce((s, t) => s + t.totalCount, 0), [teamsWithCounts]);
-  const leader = teamsWithCounts[0];
-
-  // Build a quick lookup: teamId → totalCount
-  const countByTeam = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const t of teamsWithCounts) m[t.id] = t.totalCount;
-    return m;
-  }, [teamsWithCounts]);
+  const leader = teamsWithCounts.find(t => t.totalCount > 0);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -98,11 +92,11 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
 
         {/* ── CURRENT LEADER ─────────────────────────────────────── */}
-        {leader && (
+        {leader ? (
           <div className="bg-card/60 border border-border/50 rounded-xl p-5 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Crown className="w-8 h-8 text-primary fill-primary/30" />
-              <span className="text-4xl">{leader.flag}</span>
+              <FlagImg emoji={leader.flag} size={48} alt={leader.name} />
               <div>
                 <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Current Leader</div>
                 <div className="text-2xl font-black uppercase tracking-wide">{leader.name}</div>
@@ -111,6 +105,11 @@ export default function Home() {
             <div className="text-right">
               <div className="text-3xl font-black text-primary tabular-nums">{leader.totalCount.toLocaleString()} flags</div>
             </div>
+          </div>
+        ) : (
+          <div className="bg-card/60 border border-border/50 rounded-xl p-5 flex items-center gap-4 text-muted-foreground">
+            <Crown className="w-7 h-7 opacity-40" />
+            <span className="text-sm uppercase tracking-widest">Be the first to hang your nation's flag and claim the top spot</span>
           </div>
         )}
 
@@ -141,70 +140,36 @@ export default function Home() {
               style={{
                 width: 2000,
                 height: 1500,
-                top: '50%',
-                left: '50%',
+                top: "50%",
+                left: "50%",
                 transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))`,
               }}
             >
               {loadingFlags ? (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Loading Wall...</span>
+                  <span className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Loading Wall…</span>
+                </div>
+              ) : !flags?.length ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-muted-foreground text-sm uppercase tracking-widest">Be the first — hang your flag!</span>
                 </div>
               ) : (
-                <>
-                  {/* ── Team pins: flag + count ─────────────────────── */}
-                  {TEAMS.map(team => {
-                    const pos = TEAM_PINS[team.id];
-                    const count = countByTeam[team.id] ?? team.baseCount;
-                    return (
-                      <motion.div
-                        key={`pin-${team.id}`}
-                        initial={{ opacity: 0, scale: 0.6 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.05 }}
-                        className="absolute flex flex-col items-center select-none pointer-events-none"
-                        style={{ left: pos.x - 24, top: pos.y - 28 }}
-                      >
-                        {/* flag emoji */}
-                        <span className="text-3xl leading-none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9))' }}>
-                          {team.flag}
-                        </span>
-                        {/* count badge */}
-                        <span
-                          className="mt-1 px-1.5 py-0.5 rounded text-[10px] font-black tabular-nums leading-none"
-                          style={{ background: 'rgba(0,0,0,0.75)', color: '#f5c842', border: '1px solid rgba(245,200,66,0.35)' }}
-                        >
-                          {count}
-                        </span>
-                        {/* tiny name */}
-                        <span
-                          className="mt-0.5 text-[8px] uppercase tracking-wider font-bold leading-none"
-                          style={{ color: 'rgba(255,255,255,0.55)', textShadow: '0 1px 3px #000' }}
-                        >
-                          {team.name.length > 9 ? team.name.slice(0, 8) + '…' : team.name}
-                        </span>
-                      </motion.div>
-                    );
-                  })}
-
-                  {/* ── Individual placed flags from DB ─────────────── */}
-                  {flags?.map(flag => {
-                    const team = TEAMS.find(t => t.id === flag.teamId);
-                    if (!team) return null;
-                    return (
-                      <motion.div
-                        initial={{ scale: 0, rotate: -10 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        key={flag.id}
-                        className="absolute text-xl select-none"
-                        style={{ left: flag.x, top: flag.y, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9))' }}
-                        title={team.name}
-                      >
-                        {team.flag}
-                      </motion.div>
-                    );
-                  })}
-                </>
+                flags.map(flag => {
+                  const team = TEAMS.find(t => t.id === flag.teamId);
+                  if (!team) return null;
+                  return (
+                    <motion.div
+                      initial={{ scale: 0, rotate: -10 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      key={flag.id}
+                      className="absolute"
+                      style={{ left: flag.x, top: flag.y }}
+                      title={team.name}
+                    >
+                      <FlagImg emoji={team.flag} size={36} alt={team.name} style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.9))" }} />
+                    </motion.div>
+                  );
+                })
               )}
             </div>
 
@@ -216,7 +181,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── NATIONS LEADERBOARD ─────────────────────────────────── */}
+        {/* ── NATIONS GRID ──────────────────────────────────────────── */}
         <div>
           <h2 className="text-xl font-black uppercase tracking-wider mb-4">Nations</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -229,7 +194,7 @@ export default function Home() {
               >
                 <Link href={`/checkout/${team.id}`}>
                   <div className="bg-card/60 border border-border/50 hover:border-primary/60 hover:bg-card transition-all rounded-xl p-4 flex flex-col items-center gap-2 text-center group cursor-pointer">
-                    <span className="text-3xl">{team.flag}</span>
+                    <FlagImg emoji={team.flag} size={40} alt={team.name} />
                     <div className="font-bold text-xs uppercase tracking-wide group-hover:text-primary transition-colors">{team.name}</div>
                     <div className="text-sm font-black text-primary tabular-nums">{team.totalCount}</div>
                     <Button size="sm" className="h-6 text-[10px] w-full uppercase tracking-wider font-bold">

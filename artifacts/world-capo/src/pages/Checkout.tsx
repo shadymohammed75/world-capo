@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { TEAMS } from "@/lib/teams";
+import { FlagImg } from "@/components/FlagImg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,11 +19,22 @@ export default function Checkout() {
   const team = TEAMS.find(t => t.id === teamId);
 
   const createIntent = useCreatePaymentIntent();
-  const [coords] = useState({ x: Math.floor(Math.random() * 1800 + 100), y: Math.floor(Math.random() * 1300 + 100) });
+
+  // Start at a random position on the 2000×1500 canvas
+  const [coords, setCoords] = useState(() => ({
+    x: Math.floor(Math.random() * 1800 + 100),
+    y: Math.floor(Math.random() * 1300 + 100),
+  }));
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [tab, setTab] = useState<"card" | "apple">("apple");
+
+  // Track drag state for the preview flag
+  const isDraggingFlag = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const [flagPos, setFlagPos] = useState({ x: 150, y: 100 }); // position within preview box
 
   useEffect(() => {
     if (team && !paymentIntentId && !createIntent.isPending) {
@@ -61,6 +73,28 @@ export default function Checkout() {
     confirmPayment();
   };
 
+  // Drag handlers for the preview box
+  const handleFlagMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingFlag.current = true;
+    dragOffset.current = { x: e.clientX - flagPos.x, y: e.clientY - flagPos.y };
+  };
+
+  const handlePreviewMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingFlag.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const newX = Math.max(16, Math.min(rect.width - 48, e.clientX - dragOffset.current.x));
+    const newY = Math.max(16, Math.min(rect.height - 48, e.clientY - dragOffset.current.y));
+    setFlagPos({ x: newX, y: newY });
+    // Map preview coords (≈ 300×200 box) to canvas coords (2000×1500)
+    setCoords({
+      x: Math.round((newX / rect.width) * 2000),
+      y: Math.round((newY / rect.height) * 1500),
+    });
+  };
+
+  const handlePreviewMouseUp = () => { isDraggingFlag.current = false; };
+
   if (success) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -69,7 +103,7 @@ export default function Checkout() {
           animate={{ scale: 1, opacity: 1 }}
           className="text-center space-y-4"
         >
-          <div className="text-8xl">{team.flag}</div>
+          <FlagImg emoji={team.flag} size={96} alt={team.name} className="mx-auto" />
           <h2 className="text-3xl font-black text-primary uppercase tracking-wider">Flag Placed!</h2>
           <p className="text-muted-foreground">Your flag is now live on the wall. Redirecting…</p>
         </motion.div>
@@ -105,23 +139,40 @@ export default function Checkout() {
             </p>
           </div>
 
-          {/* Mini wall preview */}
+          {/* Mini wall preview — drag flag to pick placement */}
           <Card className="bg-card/50 border-border/50">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Placement Preview</CardTitle>
+              <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
+                Placement Preview · <span className="text-primary">Drag the flag to choose your spot</span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="aspect-video bg-black/40 rounded-lg border border-white/5 relative overflow-hidden flex items-center justify-center">
+              <div
+                className="relative bg-black/40 rounded-lg border border-white/5 overflow-hidden select-none"
+                style={{ height: 220 }}
+                onMouseMove={handlePreviewMouseMove}
+                onMouseUp={handlePreviewMouseUp}
+                onMouseLeave={handlePreviewMouseUp}
+              >
+                {/* grid bg */}
                 <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'linear-gradient(#2a4a2a 1px, transparent 1px), linear-gradient(90deg, #2a4a2a 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-                <motion.div
-                  className="text-6xl filter drop-shadow-2xl z-10"
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+
+                {/* draggable flag */}
+                <div
+                  className="absolute cursor-grab active:cursor-grabbing"
+                  style={{ left: flagPos.x, top: flagPos.y, transform: "translate(-50%,-50%)" }}
+                  onMouseDown={handleFlagMouseDown}
                 >
-                  {team.flag}
-                </motion.div>
-                <div className="absolute bottom-3 text-xs text-muted-foreground uppercase tracking-widest">
-                  Will be placed at a random spot on the wall
+                  <FlagImg
+                    emoji={team.flag}
+                    size={48}
+                    alt={team.name}
+                    style={{ filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.9))", pointerEvents: "none" }}
+                  />
+                </div>
+
+                <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-muted-foreground uppercase tracking-widest pointer-events-none">
+                  Drag to position
                 </div>
               </div>
             </CardContent>
@@ -176,7 +227,7 @@ export default function Checkout() {
                       onClick={confirmPayment}
                       disabled={isProcessing || !paymentIntentId}
                       className="w-full h-14 rounded-xl font-semibold text-lg tracking-wide transition-all disabled:opacity-50"
-                      style={{ background: isProcessing ? '#333' : '#000', color: '#fff', border: 'none', cursor: isProcessing ? 'not-allowed' : 'pointer' }}
+                      style={{ background: isProcessing ? "#333" : "#000", color: "#fff", border: "none", cursor: isProcessing ? "not-allowed" : "pointer" }}
                     >
                       {isProcessing ? (
                         <span className="flex items-center justify-center gap-2">
