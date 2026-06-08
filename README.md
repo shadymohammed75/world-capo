@@ -75,6 +75,32 @@ The frontend proxies `/api` → `http://localhost:3000` (see `vite.config.ts`).
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks + Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes
 
+## Pre-deployment test procedure
+
+`scripts/src/test-api.ts` is a black-box smoke test that checks every feature
+against a **running** API server: health, security headers, flags, payments,
+GDPR, and admin (login + token auth). It auto-detects dev vs live Stripe mode
+and open vs password-protected admin, so it is safe to run against local dev or
+production.
+
+```bash
+# 1. Start the API server first (see "Run" above), then:
+
+# local dev (API on :3000, ADMIN_PASSWORD=admin)
+pnpm --filter @workspace/scripts run test-api
+
+# against production
+API_URL=https://yourdomain.com/api ADMIN_PASSWORD=yourpass \
+  pnpm --filter @workspace/scripts run test-api
+
+# also exercise the rate limiters (consumes the request budget)
+TEST_RATE_LIMIT=1 pnpm --filter @workspace/scripts run test-api
+```
+
+Exits non-zero if any test fails, so it can gate a deploy. The mock-payment
+tests only run in dev mode; in live mode they assert the mock endpoint is
+disabled instead of writing to the database.
+
 ## Architecture & security
 
 - Stripe PaymentIntent flow: frontend creates intent on **"Continue to Payment"** → user pays → webhook confirms → flag placed
