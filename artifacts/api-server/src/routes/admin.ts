@@ -1,4 +1,5 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { createHash } from "crypto";
 import { db, paymentsTable, flagsTable } from "@workspace/db";
 import { eq, count, sum, desc, and, gte } from "drizzle-orm";
 import {
@@ -10,7 +11,46 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/admin/stats", async (req, res): Promise<void> => {
+function getExpectedToken(): string | null {
+  const pw = process.env.ADMIN_PASSWORD;
+  if (!pw) return null;
+  return createHash("sha256").update(`admin-token:${pw}`).digest("hex");
+}
+
+function adminAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const expectedToken = getExpectedToken();
+  if (!expectedToken) {
+    // ADMIN_PASSWORD not set — open access in dev mode
+    next();
+    return;
+  }
+  const auth = req.headers.authorization;
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (token !== expectedToken) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}
+
+// POST /api/admin/login — validates password against ADMIN_PASSWORD env var
+router.post("/admin/login", (req, res): void => {
+  const expectedPw = process.env.ADMIN_PASSWORD;
+  if (!expectedPw) {
+    // Dev mode — no password required
+    res.json({ token: "dev-mode-no-auth" });
+    return;
+  }
+  const { password } = req.body ?? {};
+  if (!password || password !== expectedPw) {
+    res.status(401).json({ error: "Invalid password" });
+    return;
+  }
+  const token = getExpectedToken()!;
+  res.json({ token });
+});
+
+router.get("/admin/stats", adminAuthMiddleware, async (req, res): Promise<void> => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -41,7 +81,7 @@ router.get("/admin/stats", async (req, res): Promise<void> => {
   }));
 });
 
-router.get("/admin/payments", async (req, res): Promise<void> => {
+router.get("/admin/payments", adminAuthMiddleware, async (req, res): Promise<void> => {
   const qp = ListAdminPaymentsQueryParams.safeParse(req.query);
   const page = qp.success && qp.data.page ? qp.data.page : 1;
   const limit = qp.success && qp.data.limit ? qp.data.limit : 20;
@@ -74,7 +114,7 @@ router.get("/admin/payments", async (req, res): Promise<void> => {
   }));
 });
 
-router.get("/admin/team-breakdown", async (req, res): Promise<void> => {
+router.get("/admin/team-breakdown", adminAuthMiddleware, async (req, res): Promise<void> => {
   const [payments, flags] = await Promise.all([
     db.select().from(paymentsTable).where(eq(paymentsTable.status, "succeeded")),
     db.select().from(flagsTable),

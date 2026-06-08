@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { rateLimit } from "express-rate-limit";
 import { db, paymentsTable, flagsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
@@ -19,6 +20,14 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 const FLAG_PRICE_CENTS = 70; // €0.70
+
+const paymentIntentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many payment requests, please try again later" },
+});
 
 function hashValue(val: string): string {
   return createHash("sha256").update(val).digest("hex");
@@ -42,7 +51,7 @@ router.get("/payments/config", (_req, res): void => {
 });
 
 // POST /api/payments/intent
-router.post("/payments/intent", async (req, res): Promise<void> => {
+router.post("/payments/intent", paymentIntentLimiter, async (req, res): Promise<void> => {
   const parsed = CreatePaymentIntentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -154,8 +163,13 @@ router.post(
   }
 );
 
-// POST /api/payments/confirm-mock/:intentId — for development simulation
+// POST /api/payments/confirm-mock/:intentId — for development simulation only
 router.post("/payments/confirm-mock/:intentId", async (req, res): Promise<void> => {
+  if (process.env.STRIPE_SECRET_KEY) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
   const raw = Array.isArray(req.params.intentId) ? req.params.intentId[0] : req.params.intentId;
 
   // Check if it exists at all

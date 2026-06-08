@@ -9,6 +9,7 @@ import {
   useGetAdminStats, getGetAdminStatsQueryKey,
   useListAdminPayments, getListAdminPaymentsQueryKey,
   useGetTeamBreakdown, getGetTeamBreakdownQueryKey,
+  setAuthTokenGetter,
 } from "@workspace/api-client-react";
 import { TEAMS } from "@/lib/teams";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -23,18 +24,32 @@ export default function Admin() {
   const { data: breakdown, isLoading: loadingBreakdown } = useGetTeamBreakdown({ query: { enabled: isAuthenticated, queryKey: getGetTeamBreakdownQueryKey() } });
 
   useEffect(() => {
-    const auth = sessionStorage.getItem("admin_auth");
-    if (auth === "true") setIsAuthenticated(true);
+    const token = sessionStorage.getItem("admin_token");
+    if (token) {
+      setAuthTokenGetter(() => token);
+      setIsAuthenticated(true);
+    }
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === "worldcapo2026") {
-      sessionStorage.setItem("admin_auth", "true");
-      setIsAuthenticated(true);
-      setError("");
-    } else {
-      setError("Invalid password");
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        const { token } = await res.json();
+        sessionStorage.setItem("admin_token", token);
+        setAuthTokenGetter(() => token);
+        setIsAuthenticated(true);
+        setError("");
+      } else {
+        setError("Invalid password");
+      }
+    } catch {
+      setError("Login failed, please try again");
     }
   };
 
