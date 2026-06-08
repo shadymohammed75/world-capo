@@ -10,8 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Crown } from "lucide-react";
 
 export default function Home() {
-  const { data: flags, isLoading: loadingFlags } = useListFlags();
-  const { data: counts } = useGetFlagCounts();
+  const { data: flags, isLoading: loadingFlags } = useListFlags({ query: { refetchInterval: 10_000 } });
+  const { data: counts } = useGetFlagCounts({ query: { refetchInterval: 10_000 } });
   const { toast } = useToast();
 
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -122,7 +122,7 @@ export default function Home() {
 
           <div
             className="relative overflow-hidden rounded-xl border border-border/40 bg-[#0a0f0a] cursor-grab active:cursor-grabbing"
-            style={{ height: 680 }}
+            style={{ height: 480 }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
