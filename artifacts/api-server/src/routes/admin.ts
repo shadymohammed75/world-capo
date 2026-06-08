@@ -96,15 +96,17 @@ router.get("/admin/payments", adminAuthMiddleware, async (req, res): Promise<voi
   const limit = qp.success && qp.data.limit ? qp.data.limit : 20;
   const status = qp.success && qp.data.status ? qp.data.status : undefined;
 
-  const baseQuery = db.select().from(paymentsTable);
-
-  let filtered = status
+  const filtered = status
     ? db.select().from(paymentsTable).where(eq(paymentsTable.status, status))
     : db.select().from(paymentsTable);
 
+  const countQuery = status
+    ? db.select({ count: count() }).from(paymentsTable).where(eq(paymentsTable.status, status))
+    : db.select({ count: count() }).from(paymentsTable);
+
   const [payments, totalResult] = await Promise.all([
     filtered.orderBy(desc(paymentsTable.createdAt)).limit(limit).offset((page - 1) * limit),
-    db.select({ count: count() }).from(paymentsTable),
+    countQuery,
   ]);
 
   res.json(ListAdminPaymentsResponse.parse({

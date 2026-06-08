@@ -143,19 +143,24 @@ export default function Checkout() {
   };
   const handlePreviewTouchEnd = () => { isDraggingFlag.current = false; };
 
-  useEffect(() => {
-    if (team && !paymentIntentId && !createIntent.isPending) {
-      createIntent.mutate(
-        { data: { teamId: team.id, x: coords.x, y: coords.y } },
-        {
-          onSuccess: (data) => {
-            setPaymentIntentId(data.paymentIntentId);
-            setClientSecret(data.clientSecret);
-          }
-        }
-      );
-    }
-  }, [team]);
+  // Create the PaymentIntent only when the user commits to paying — not on page
+  // load. This avoids abandoned intents from bounced visitors, and captures the
+  // final dragged flag position (not the position at mount time).
+  const startPayment = () => {
+    if (!team || paymentIntentId || createIntent.isPending) return;
+    createIntent.mutate(
+      { data: { teamId: team.id, x: coords.x, y: coords.y } },
+      {
+        onSuccess: (data) => {
+          setPaymentIntentId(data.paymentIntentId);
+          setClientSecret(data.clientSecret);
+        },
+        onError: () => {
+          toast({ title: "Could not start checkout", description: "Please try again.", variant: "destructive" });
+        },
+      }
+    );
+  };
 
   if (!team) {
     return (
@@ -293,6 +298,27 @@ export default function Checkout() {
                 <span className="text-2xl font-black text-primary">€0.70</span>
               </div>
 
+              {/* ── STEP 1: confirm placement, then start checkout ── */}
+              {stripeConfig !== null && !paymentIntentId && (
+                <>
+                  <Button
+                    onClick={startPayment}
+                    disabled={createIntent.isPending}
+                    className="w-full h-14 text-lg font-bold uppercase tracking-wider"
+                  >
+                    {createIntent.isPending ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Preparing…
+                      </span>
+                    ) : "Continue to Payment · €0.70"}
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Position your flag on the left, then continue to pay.
+                  </p>
+                </>
+              )}
+
               {/* ── LIVE STRIPE MODE ── */}
               {isLiveStripe && (
                 <Elements
@@ -310,7 +336,7 @@ export default function Checkout() {
               )}
 
               {/* ── DEV / MOCK MODE ── */}
-              {!isLiveStripe && stripeConfig !== null && (
+              {paymentIntentId && !isLiveStripe && stripeConfig !== null && (
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <button

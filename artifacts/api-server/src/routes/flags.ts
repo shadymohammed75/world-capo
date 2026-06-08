@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, flagsTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { desc, count } from "drizzle-orm";
 import { ListFlagsResponse, GetFlagCountsResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -22,14 +22,14 @@ router.get("/flags", async (req, res): Promise<void> => {
 });
 
 router.get("/flags/counts", async (req, res): Promise<void> => {
-  const flags = await db.select().from(flagsTable);
+  // Aggregate in the database (SELECT team_id, COUNT(*) ... GROUP BY team_id)
+  // instead of pulling every row and counting in JS.
+  const rows = await db
+    .select({ teamId: flagsTable.teamId, count: count() })
+    .from(flagsTable)
+    .groupBy(flagsTable.teamId);
 
-  const countMap: Record<string, number> = {};
-  for (const flag of flags) {
-    countMap[flag.teamId] = (countMap[flag.teamId] ?? 0) + 1;
-  }
-
-  const result = Object.entries(countMap).map(([teamId, count]) => ({ teamId, count }));
+  const result = rows.map((r) => ({ teamId: r.teamId, count: Number(r.count) }));
   res.json(GetFlagCountsResponse.parse(result));
 });
 
