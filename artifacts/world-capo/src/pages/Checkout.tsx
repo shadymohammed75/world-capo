@@ -73,27 +73,40 @@ export default function Checkout() {
     confirmPayment();
   };
 
-  // Drag handlers for the preview box
-  const handleFlagMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    isDraggingFlag.current = true;
-    dragOffset.current = { x: e.clientX - flagPos.x, y: e.clientY - flagPos.y };
-  };
-
-  const handlePreviewMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingFlag.current) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const newX = Math.max(16, Math.min(rect.width - 48, e.clientX - dragOffset.current.x));
-    const newY = Math.max(16, Math.min(rect.height - 48, e.clientY - dragOffset.current.y));
+  // Shared move logic
+  const applyMove = (clientX: number, clientY: number, rect: DOMRect) => {
+    const newX = Math.max(16, Math.min(rect.width - 32, clientX - rect.left));
+    const newY = Math.max(16, Math.min(rect.height - 32, clientY - rect.top));
     setFlagPos({ x: newX, y: newY });
-    // Map preview coords (≈ 300×200 box) to canvas coords (2000×1500)
     setCoords({
       x: Math.round((newX / rect.width) * 2000),
       y: Math.round((newY / rect.height) * 1500),
     });
   };
 
+  // Mouse drag
+  const handleFlagMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingFlag.current = true;
+  };
+  const handlePreviewMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingFlag.current) return;
+    applyMove(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect());
+  };
   const handlePreviewMouseUp = () => { isDraggingFlag.current = false; };
+
+  // Touch drag
+  const previewRef = useRef<HTMLDivElement>(null);
+  const handlePreviewTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    isDraggingFlag.current = true;
+  };
+  const handlePreviewTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDraggingFlag.current || !previewRef.current) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    applyMove(t.clientX, t.clientY, previewRef.current.getBoundingClientRect());
+  };
+  const handlePreviewTouchEnd = () => { isDraggingFlag.current = false; };
 
   if (success) {
     return (
@@ -148,11 +161,15 @@ export default function Checkout() {
             </CardHeader>
             <CardContent>
               <div
-                className="relative bg-black/40 rounded-lg border border-white/5 overflow-hidden select-none"
-                style={{ height: 220 }}
+                ref={previewRef}
+                className="relative bg-black/40 rounded-lg border border-white/5 overflow-hidden select-none touch-none"
+                style={{ height: 260 }}
                 onMouseMove={handlePreviewMouseMove}
                 onMouseUp={handlePreviewMouseUp}
                 onMouseLeave={handlePreviewMouseUp}
+                onTouchStart={handlePreviewTouchStart}
+                onTouchMove={handlePreviewTouchMove}
+                onTouchEnd={handlePreviewTouchEnd}
               >
                 {/* grid bg */}
                 <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'linear-gradient(#2a4a2a 1px, transparent 1px), linear-gradient(90deg, #2a4a2a 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
@@ -165,14 +182,14 @@ export default function Checkout() {
                 >
                   <FlagImg
                     emoji={team.flag}
-                    size={48}
+                    size={56}
                     alt={team.name}
                     style={{ filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.9))", pointerEvents: "none" }}
                   />
                 </div>
 
                 <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-muted-foreground uppercase tracking-widest pointer-events-none">
-                  Drag to position
+                  Touch &amp; drag to position your flag
                 </div>
               </div>
             </CardContent>
