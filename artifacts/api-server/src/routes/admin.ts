@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { createHash } from "crypto";
+import { rateLimit } from "express-rate-limit";
 import { db, paymentsTable, flagsTable } from "@workspace/db";
 import { eq, count, sum, desc, and, gte } from "drizzle-orm";
 import {
@@ -10,6 +11,14 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many login attempts, please try again later" },
+});
 
 function getExpectedToken(): string | null {
   const pw = process.env.ADMIN_PASSWORD;
@@ -34,7 +43,7 @@ function adminAuthMiddleware(req: Request, res: Response, next: NextFunction): v
 }
 
 // POST /api/admin/login — validates password against ADMIN_PASSWORD env var
-router.post("/admin/login", (req, res): void => {
+router.post("/admin/login", adminLoginLimiter, (req, res): void => {
   const expectedPw = process.env.ADMIN_PASSWORD;
   if (!expectedPw) {
     // Dev mode — no password required
