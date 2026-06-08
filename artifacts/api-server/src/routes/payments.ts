@@ -100,6 +100,9 @@ router.post("/payments/intent", paymentIntentLimiter, async (req, res): Promise<
     const paymentIntent = await stripe.paymentIntents.create({
       amount: FLAG_PRICE_CENTS,
       currency: "eur",
+      // Enables cards + wallets (Apple Pay / Google Pay / Link) automatically,
+      // based on what's turned on in your Stripe Dashboard.
+      automatic_payment_methods: { enabled: true },
       metadata: { teamId, x: String(x), y: String(y) },
       ...(email ? { receipt_email: email } : {}),
     });
@@ -214,10 +217,15 @@ router.post("/payments/confirm-mock/:intentId", async (req, res): Promise<void> 
 
 async function handlePaymentSucceeded(paymentIntent: { id: string }) {
   try {
+    // Only transition pending → succeeded. Stripe can deliver the same webhook
+    // more than once; the status guard ensures we place exactly one flag.
     const [payment] = await db
       .update(paymentsTable)
       .set({ status: "succeeded" })
-      .where(eq(paymentsTable.stripePaymentIntentId, paymentIntent.id))
+      .where(and(
+        eq(paymentsTable.stripePaymentIntentId, paymentIntent.id),
+        eq(paymentsTable.status, "pending"),
+      ))
       .returning();
 
     if (payment) {
@@ -228,6 +236,8 @@ async function handlePaymentSucceeded(paymentIntent: { id: string }) {
         paymentId: payment.stripePaymentIntentId,
       });
       logger.info({ paymentIntentId: paymentIntent.id }, "Flag placed after payment succeeded");
+    } else {
+      logger.info({ paymentIntentId: paymentIntent.id }, "Duplicate or already-processed webhook ignored");
     }
   } catch (err) {
     logger.error({ err, paymentIntentId: paymentIntent.id }, "Failed to process successful payment");

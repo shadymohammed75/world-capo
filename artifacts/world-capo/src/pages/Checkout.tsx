@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Lock, CreditCard } from "lucide-react";
 import { Link } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Elements, PaymentElement, ExpressCheckoutElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 // ─── Stripe real payment form ──────────────────────────────────
 function StripePaymentForm({ onSuccess }: { onSuccess: () => void }) {
@@ -20,11 +20,11 @@ function StripePaymentForm({ onSuccess }: { onSuccess: () => void }) {
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasWallets, setHasWallets] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Confirms the PaymentIntent. Shared by the wallet buttons and the card form.
+  const confirm = async () => {
     if (!stripe || !elements) return;
-    setIsProcessing(true);
     const { error } = await stripe.confirmPayment({
       elements,
       redirect: "if_required",
@@ -37,25 +37,47 @@ function StripePaymentForm({ onSuccess }: { onSuccess: () => void }) {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    await confirm();
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <PaymentElement options={{ layout: "tabs" }} />
-      <Button
-        type="submit"
-        className="w-full h-12 text-base font-bold uppercase tracking-wider"
-        disabled={isProcessing || !stripe || !elements}
-      >
-        {isProcessing ? (
-          <span className="flex items-center gap-2">
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            Processing…
-          </span>
-        ) : "Pay €0.70"}
-      </Button>
-      <p className="text-xs text-center text-muted-foreground">
-        Secured by Stripe · All card data encrypted
-      </p>
-    </form>
+    <div className="space-y-5">
+      {/* Apple Pay / Google Pay / Link — only renders when a wallet is available */}
+      <ExpressCheckoutElement
+        onReady={(e) => setHasWallets(!!e.availablePaymentMethods)}
+        onConfirm={confirm}
+      />
+
+      {hasWallets && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex-1 h-px bg-border" />
+          OR PAY WITH CARD
+          <span className="flex-1 h-px bg-border" />
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <PaymentElement options={{ layout: "tabs" }} />
+        <Button
+          type="submit"
+          className="w-full h-12 text-base font-bold uppercase tracking-wider"
+          disabled={isProcessing || !stripe || !elements}
+        >
+          {isProcessing ? (
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Processing…
+            </span>
+          ) : "Pay €0.70"}
+        </Button>
+        <p className="text-xs text-center text-muted-foreground">
+          Secured by Stripe · All card data encrypted
+        </p>
+      </form>
+    </div>
   );
 }
 
