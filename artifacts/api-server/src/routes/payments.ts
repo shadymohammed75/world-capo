@@ -35,6 +35,12 @@ function rawBodyMiddleware(req: Request & { rawBody?: Buffer }, _res: Response, 
   req.on("error", next);
 }
 
+// GET /api/payments/config — returns publishable key for frontend
+router.get("/payments/config", (_req, res): void => {
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY ?? null;
+  res.json({ publishableKey, devMode: !process.env.STRIPE_SECRET_KEY });
+});
+
 // POST /api/payments/intent
 router.post("/payments/intent", async (req, res): Promise<void> => {
   const parsed = CreatePaymentIntentBody.safeParse(req.body);
