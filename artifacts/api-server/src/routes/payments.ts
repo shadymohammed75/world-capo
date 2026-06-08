@@ -1,6 +1,13 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, paymentsTable, flagsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+
+const VALID_TEAM_IDS = new Set([
+  "DZA","ARG","AUT","AUS","BEL","BIH","BRA","CPV","CAN","COL","COD","CIV","CRO","CZE","CUW",
+  "ECU","EGY","ENG","FRA","DEU","GHA","HTI","IRN","IRQ","JPN","JOR","KOR","MEX","MAR","NLD",
+  "NZL","NOR","PAN","PRY","POR","QAT","SAU","SCO","SEN","RSA","ESP","SWE","CHE","TUN","TUR",
+  "USA","URY","UZB",
+]);
 import { createHash } from "crypto";
 import {
   CreatePaymentIntentBody,
@@ -37,6 +44,12 @@ router.post("/payments/intent", async (req, res): Promise<void> => {
   }
 
   const { teamId, x, y, email } = parsed.data;
+
+  if (!VALID_TEAM_IDS.has(teamId)) {
+    res.status(400).json({ error: `Unknown team: ${teamId}` });
+    return;
+  }
+
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "";
   const emailHash = email ? hashValue(email) : null;
@@ -139,14 +152,33 @@ router.post(
 router.post("/payments/confirm-mock/:intentId", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.intentId) ? req.params.intentId[0] : req.params.intentId;
 
+  // Check if it exists at all
+  const [existing] = await db
+    .select()
+    .from(paymentsTable)
+    .where(eq(paymentsTable.stripePaymentIntentId, raw));
+
+  if (!existing) {
+    res.status(404).json({ error: "Payment intent not found" });
+    return;
+  }
+
+  if (existing.status === "succeeded") {
+    res.status(400).json({ error: "Payment already confirmed" });
+    return;
+  }
+
   const [payment] = await db
     .update(paymentsTable)
     .set({ status: "succeeded" })
-    .where(eq(paymentsTable.stripePaymentIntentId, raw))
+    .where(and(
+      eq(paymentsTable.stripePaymentIntentId, raw),
+      eq(paymentsTable.status, "pending"),
+    ))
     .returning();
 
   if (!payment) {
-    res.status(404).json({ error: "Payment intent not found" });
+    res.status(400).json({ error: "Payment already confirmed" });
     return;
   }
 
