@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getListFlagsQueryOptions, getGetFlagCountsQueryOptions } from "@workspace/api-client-react";
 import { TEAMS } from "@/lib/teams";
 import { CookieConsent } from "@/components/CookieConsent";
+import { Footer } from "@/components/Footer";
 import { FlagImg } from "@/components/FlagImg";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -250,6 +251,7 @@ export default function Home() {
 
       </main>
 
+      <Footer />
       <CookieConsent />
     </div>
   );

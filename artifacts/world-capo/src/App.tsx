@@ -6,6 +6,8 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Checkout from "@/pages/Checkout";
 import Admin from "@/pages/Admin";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
 
 const queryClient = new QueryClient();
 
@@ -15,6 +17,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/checkout/:teamId" component={Checkout} />
       <Route path="/admin" component={Admin} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
       <Route component={NotFound} />
     </Switch>
   );
