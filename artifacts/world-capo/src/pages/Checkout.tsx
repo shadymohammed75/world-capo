@@ -100,6 +100,8 @@ export default function Checkout() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [tab, setTab] = useState<"stripe" | "card">("stripe");
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   // Stripe config
   const [stripeConfig, setStripeConfig] = useState<{ publishableKey: string | null; devMode: boolean } | null>(null);
@@ -148,8 +150,18 @@ export default function Checkout() {
   // final dragged flag position (not the position at mount time).
   const startPayment = () => {
     if (!team || paymentIntentId || createIntent.isPending) return;
+
+    // Email is optional, but if provided it must be valid — it's sent to Stripe
+    // as receipt_email so the buyer gets an emailed receipt.
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+    setEmailError("");
+
     createIntent.mutate(
-      { data: { teamId: team.id, x: coords.x, y: coords.y } },
+      { data: { teamId: team.id, x: coords.x, y: coords.y, ...(trimmedEmail ? { email: trimmedEmail } : {}) } },
       {
         onSuccess: (data) => {
           setPaymentIntentId(data.paymentIntentId);
@@ -301,6 +313,25 @@ export default function Checkout() {
               {/* ── STEP 1: confirm placement, then start checkout ── */}
               {stripeConfig !== null && !paymentIntentId && (
                 <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="receipt-email" className="uppercase tracking-wider text-xs text-muted-foreground">
+                      Email for receipt <span className="normal-case tracking-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="receipt-email"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(""); }}
+                      className="bg-background/50"
+                    />
+                    {emailError
+                      ? <p className="text-destructive text-xs font-medium">{emailError}</p>
+                      : <p className="text-xs text-muted-foreground">We'll email you a receipt for your €0.70 payment.</p>}
+                  </div>
+
                   <Button
                     onClick={startPayment}
                     disabled={createIntent.isPending}
