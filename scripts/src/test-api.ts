@@ -86,6 +86,14 @@ await test("Health check returns 200 + status ok", async () => {
   assert(body.status === "ok", `Expected status=ok, got ${JSON.stringify(body)}`);
 });
 
+// ─── 404 HANDLER ──────────────────────────────────────────────
+await test("Unmatched route returns JSON 404", async () => {
+  const res = await fetch(`${BASE}/does-not-exist-${Date.now()}`);
+  assert(res.status === 404, `Expected 404, got ${res.status}`);
+  const body = await json(res);
+  assert(body.error === "Not found", `Expected JSON {error:'Not found'}, got ${JSON.stringify(body)}`);
+});
+
 // ─── SECURITY HEADERS (helmet) ────────────────────────────────
 await test("Security headers present (helmet)", async () => {
   const res = await fetch(`${BASE}/healthz`);

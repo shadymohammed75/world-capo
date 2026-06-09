@@ -58,12 +58,17 @@ router.post("/payments/intent", paymentIntentLimiter, async (req, res): Promise<
     return;
   }
 
-  const { teamId, x, y, email } = parsed.data;
+  const { teamId, email } = parsed.data;
 
   if (!VALID_TEAM_IDS.has(teamId)) {
     res.status(400).json({ error: `Unknown team: ${teamId}` });
     return;
   }
+
+  // The wall is a fixed 2000×1500 canvas — clamp so a crafted request can't
+  // place a flag off-screen.
+  const x = Math.min(2000, Math.max(0, parsed.data.x));
+  const y = Math.min(1500, Math.max(0, parsed.data.y));
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "";
