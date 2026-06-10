@@ -10,7 +10,7 @@ export function Footer() {
             {SITE.name}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            © {new Date().getFullYear()} {SITE.company}. FIFA World Cup 2026 fan wall. Not affiliated with FIFA.
+            © {new Date().getFullYear()} {SITE.company}. World Cup 2026 fan wall. An unofficial fan project, not affiliated with any official competition organiser.
           </p>
         </div>
 

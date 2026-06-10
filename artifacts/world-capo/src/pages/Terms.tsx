@@ -12,9 +12,9 @@ export default function Terms() {
       <h2>1. The Service</h2>
       <p>
         {SITE.name} lets you place your nation's flag on a shared digital "fan wall" celebrating the
-        FIFA World Cup 2026, for a one-time fee of <strong>€0.70</strong> per flag. The Service is a
+        World Cup 2026, for a one-time fee of <strong>€0.70</strong> per flag. The Service is a
         novelty entertainment product and is <strong>not affiliated with, endorsed by, or sponsored by
-        FIFA</strong> or any football association.
+        any official football body or competition organiser</strong>.
       </p>
 
       <h2>2. Payment</h2>

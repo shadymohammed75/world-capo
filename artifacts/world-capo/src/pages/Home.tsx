@@ -46,7 +46,7 @@ export default function Home() {
                 World Capo
               </h1>
               <p className="text-[9px] sm:text-xs text-muted-foreground uppercase tracking-[0.2em] mt-0.5 hidden sm:block">
-                FIFA World Cup 2026 · Fan Wall
+                World Cup 2026 · Fan Wall
               </p>
             </div>
 
