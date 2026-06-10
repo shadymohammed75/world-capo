@@ -7,9 +7,10 @@ import { Footer } from "@/components/Footer";
 import { FlagImg } from "@/components/FlagImg";
 import { FlagBoard } from "@/components/FlagBoard";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Crown } from "lucide-react";
+import { Crown, Share2 } from "lucide-react";
 
 export default function Home() {
   const { data: flags, isLoading: loadingFlags } = useQuery({ ...getListFlagsQueryOptions(), refetchInterval: 10_000 });
@@ -32,6 +33,25 @@ export default function Home() {
 
   const totalPlaced = useMemo(() => teamsWithCounts.reduce((s, t) => s + t.totalCount, 0), [teamsWithCounts]);
   const leader = teamsWithCounts.find(t => t.totalCount > 0);
+
+  const { toast } = useToast();
+  const handleShare = async () => {
+    const shareData = {
+      title: "World Capo",
+      text: "Help cover the World Cup 2026 wall with our flag! 🏴 Place yours, cover rivals, and push our nation to the top.",
+      url: typeof window !== "undefined" ? window.location.origin : "",
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+        toast({ title: "Link copied!", description: "Share it with your friends to grow your nation's flags." });
+      }
+    } catch {
+      /* user dismissed the share sheet — nothing to do */
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -76,12 +96,28 @@ export default function Home() {
           <span className="bg-green-900/60 border border-green-700/50 text-green-300 rounded px-2 sm:px-3 py-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0">
             ⚽ 2026
           </span>
-          <span className="text-muted-foreground text-xs truncate">Hang your nation's flag on the world's biggest fan board</span>
+          <span className="text-muted-foreground text-xs truncate">Cover the board with your nation's flag — before rivals cover yours</span>
           <span className="text-primary font-bold ml-auto shrink-0 text-xs sm:text-sm">{freeMode ? "FREE" : "€0.70"}</span>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+
+        {/* ── SLOGAN / GOAL ──────────────────────────────────────── */}
+        <div className="bg-gradient-to-r from-primary/15 via-primary/5 to-transparent border border-primary/20 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl sm:text-3xl font-black uppercase tracking-tight leading-tight" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+              Cover the board with your flag
+            </h2>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Plant your nation's flag, cover rivals' slots, and rally your friends — the country that
+              covers the most of the wall wins. Every flag counts.
+            </p>
+          </div>
+          <Button onClick={handleShare} className="gap-2 uppercase tracking-wider font-bold shrink-0 w-full sm:w-auto">
+            <Share2 className="w-4 h-4" /> Share with friends
+          </Button>
+        </div>
 
         {/* ── CURRENT LEADER ─────────────────────────────────────── */}
         {leader ? (
