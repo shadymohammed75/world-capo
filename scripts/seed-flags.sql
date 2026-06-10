@@ -24,5 +24,7 @@ SELECT
   NULL,
   now() - (random() * interval '10 days')
 FROM (
-  SELECT generate_series(0, 1535) AS cell ORDER BY random() LIMIT :n
+  -- generate_series in the FROM clause so ORDER BY random() actually shuffles
+  -- (in the SELECT list it does not), giving N distinct cells across the board.
+  SELECT cell FROM generate_series(0, 1535) AS cell ORDER BY random() LIMIT :n
 ) cells;
