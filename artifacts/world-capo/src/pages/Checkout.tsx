@@ -104,7 +104,7 @@ export default function Checkout() {
   const [emailError, setEmailError] = useState("");
 
   // Stripe config
-  const [stripeConfig, setStripeConfig] = useState<{ publishableKey: string | null; devMode: boolean } | null>(null);
+  const [stripeConfig, setStripeConfig] = useState<{ publishableKey: string | null; devMode: boolean; freeMode?: boolean } | null>(null);
   const stripePromise = stripeConfig?.publishableKey
     ? loadStripe(stripeConfig.publishableKey)
     : null;
@@ -204,6 +204,24 @@ export default function Checkout() {
 
   const handleCardPay = (e: React.FormEvent) => { e.preventDefault(); confirmMock(); };
 
+  // Free-launch placement — no payment. Places the flag directly.
+  const placeFree = async () => {
+    if (!team) return;
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/flags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: team.id, x: coords.x, y: coords.y }),
+      });
+      if (!res.ok) throw new Error("Failed to place flag");
+      handleSuccess();
+    } catch {
+      toast({ title: "Could not place flag", description: "Please try again.", variant: "destructive" });
+      setIsProcessing(false);
+    }
+  };
+
   if (success) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -221,6 +239,7 @@ export default function Checkout() {
   }
 
   const isLiveStripe = !!stripeConfig?.publishableKey && !!clientSecret && !!stripePromise;
+  const freeMode = !!stripeConfig?.freeMode;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -299,10 +318,41 @@ export default function Checkout() {
           <Card className="border-primary/20 bg-card/80 backdrop-blur shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-primary/60" />
             <CardHeader>
-              <CardTitle className="text-xl uppercase tracking-wider">Payment Details</CardTitle>
-              <CardDescription>Secure checkout · €0.70 one-time</CardDescription>
+              <CardTitle className="text-xl uppercase tracking-wider">{freeMode ? "Place Your Flag" : "Payment Details"}</CardTitle>
+              <CardDescription>{freeMode ? "Free during our launch 🎉" : "Secure checkout · €0.70 one-time"}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
+
+              {stripeConfig === null ? (
+                <div className="flex items-center justify-center py-8">
+                  <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                </div>
+              ) : freeMode ? (
+                /* ── FREE LAUNCH MODE — no payment ── */
+                <>
+                  <div className="bg-secondary/40 p-4 rounded-lg border border-border flex justify-between items-center">
+                    <span className="font-medium uppercase tracking-widest text-sm">Total Due</span>
+                    <span className="text-2xl font-black text-primary">FREE</span>
+                  </div>
+                  <Button
+                    onClick={placeFree}
+                    disabled={isProcessing}
+                    className="w-full h-14 text-lg font-bold uppercase tracking-wider"
+                  >
+                    {isProcessing ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Placing…
+                      </span>
+                    ) : "Place Your Flag — Free"}
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Free during our launch. Position your flag on the left, then place it on the wall.
+                  </p>
+                </>
+              ) : (
+                /* ── PAID MODE (kept intact for when payments are re-enabled) ── */
+                <>
 
               {/* Amount */}
               <div className="bg-secondary/40 p-4 rounded-lg border border-border flex justify-between items-center">
@@ -442,11 +492,7 @@ export default function Checkout() {
                 </>
               )}
 
-              {/* Loading state while fetching config */}
-              {stripeConfig === null && (
-                <div className="flex items-center justify-center py-8">
-                  <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                </div>
+                </>
               )}
 
             </CardContent>

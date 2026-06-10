@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getListFlagsQueryOptions, getGetFlagCountsQueryOptions } from "@workspace/api-client-react";
 import { TEAMS } from "@/lib/teams";
@@ -13,6 +13,14 @@ import { Crown } from "lucide-react";
 export default function Home() {
   const { data: flags, isLoading: loadingFlags } = useQuery({ ...getListFlagsQueryOptions(), refetchInterval: 10_000 });
   const { data: counts } = useQuery({ ...getGetFlagCountsQueryOptions(), refetchInterval: 10_000 });
+
+  const [freeMode, setFreeMode] = useState(false);
+  useEffect(() => {
+    fetch("/api/payments/config")
+      .then(r => r.json())
+      .then(c => setFreeMode(!!c.freeMode))
+      .catch(() => {});
+  }, []);
 
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -99,7 +107,7 @@ export default function Home() {
             ⚽ 2026
           </span>
           <span className="text-muted-foreground text-xs truncate">Hang your nation's flag on the world's biggest fan board</span>
-          <span className="text-primary font-bold ml-auto shrink-0 text-xs sm:text-sm">€0.70</span>
+          <span className="text-primary font-bold ml-auto shrink-0 text-xs sm:text-sm">{freeMode ? "FREE" : "€0.70"}</span>
         </div>
       </header>
 

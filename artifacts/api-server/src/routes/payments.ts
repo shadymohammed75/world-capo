@@ -2,13 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { rateLimit } from "express-rate-limit";
 import { db, paymentsTable, flagsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-
-const VALID_TEAM_IDS = new Set([
-  "DZA","ARG","AUT","AUS","BEL","BIH","BRA","CPV","CAN","COL","COD","CIV","CRO","CZE","CUW",
-  "ECU","EGY","ENG","FRA","DEU","GHA","HTI","IRN","IRQ","JPN","JOR","KOR","MEX","MAR","NLD",
-  "NZL","NOR","PAN","PRY","POR","QAT","SAU","SCO","SEN","RSA","ESP","SWE","CHE","TUN","TUR",
-  "USA","URY","UZB",
-]);
+import { VALID_TEAM_IDS } from "../lib/teams";
 import { createHash } from "crypto";
 import {
   CreatePaymentIntentBody,
@@ -47,7 +41,12 @@ function rawBodyMiddleware(req: Request & { rawBody?: Buffer }, _res: Response, 
 // GET /api/payments/config — returns publishable key for frontend
 router.get("/payments/config", (_req, res): void => {
   const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY ?? null;
-  res.json({ publishableKey, devMode: !process.env.STRIPE_SECRET_KEY });
+  res.json({
+    publishableKey,
+    devMode: !process.env.STRIPE_SECRET_KEY,
+    // Free-launch mode: when on, flags are placed without payment.
+    freeMode: process.env.FREE_MODE === "true",
+  });
 });
 
 // POST /api/payments/intent

@@ -47,14 +47,16 @@ async function json(res: Response): Promise<any> {
 
 // ─── DISCOVERY: figure out what mode the server is in ─────────────
 let devMode = true;        // true = mock Stripe, false = live Stripe keys set
+let freeMode = false;      // true = no-payment launch mode
 let adminAuthEnabled = false;
 let adminToken: string | null = null;
 
 async function discover() {
-  // Stripe mode
+  // Stripe / free mode
   try {
     const cfg = await json(await fetch(`${BASE}/payments/config`));
     devMode = cfg?.devMode !== false;
+    freeMode = cfg?.freeMode === true;
   } catch { /* leave default */ }
 
   // Admin mode: log in with the configured password
@@ -135,12 +137,42 @@ await test("Flag counts total matches flags array length", async () => {
 });
 
 // ─── PAYMENTS ─────────────────────────────────────────────────
-await test("GET /payments/config returns publishableKey + devMode", async () => {
+await test("GET /payments/config returns publishableKey + devMode + freeMode", async () => {
   const res = await fetch(`${BASE}/payments/config`);
   assert(res.status === 200, `Expected 200, got ${res.status}`);
   const body = await json(res);
   assert("publishableKey" in body && "devMode" in body, `Expected publishableKey+devMode, got ${JSON.stringify(body)}`);
   assert(typeof body.devMode === "boolean", `devMode must be boolean`);
+  assert(typeof body.freeMode === "boolean", `freeMode must be boolean`);
+});
+
+// ─── FREE-LAUNCH MODE ─────────────────────────────────────────
+await test("POST /flags places a flag for free when FREE_MODE on (else 404)", async () => {
+  const before = (await json(await fetch(`${BASE}/flags`))).length;
+  const res = await fetch(`${BASE}/flags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teamId: "JPN", x: 1234, y: 567 }),
+  });
+  if (freeMode) {
+    assert(res.status === 200, `Expected 200 in free mode, got ${res.status}`);
+    const body = await json(res);
+    assert(body.success === true, `Expected success=true`);
+    const after = (await json(await fetch(`${BASE}/flags`))).length;
+    assert(after === before + 1, `Flag count should increase by 1 (${before} -> ${after})`);
+  } else {
+    assert(res.status === 404, `Expected 404 when free mode off, got ${res.status}`);
+  }
+});
+
+await test("POST /flags rejects unknown team", async () => {
+  if (!freeMode) return "skip";
+  const res = await fetch(`${BASE}/flags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teamId: "FAKE", x: 1, y: 1 }),
+  });
+  assert(res.status === 400, `Expected 400, got ${res.status}`);
 });
 
 let intentId: string | null = null;

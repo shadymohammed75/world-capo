@@ -32,6 +32,7 @@ NODE_ENV=development
 LOG_LEVEL=info
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/worldcapo
 ADMIN_PASSWORD=admin
+FREE_MODE=true                            # no-payment launch; set false to enable paid checkout
 # ALLOWED_ORIGIN=https://yourdomain.com   # production only
 # DATABASE_SSL=true                       # managed Postgres that requires TLS
 # TRUST_PROXY=1                           # hops when behind a reverse proxy / LB
@@ -102,6 +103,18 @@ TEST_RATE_LIMIT=1 pnpm --filter @workspace/scripts run test-api
 Exits non-zero if any test fails, so it can gate a deploy. The mock-payment
 tests only run in dev mode; in live mode they assert the mock endpoint is
 disabled instead of writing to the database.
+
+## Launch modes
+
+The app supports a **free-launch mode** controlled by the `FREE_MODE` env var:
+
+- **`FREE_MODE=true`** — flags are placed without payment. The checkout shows a
+  "Place Your Flag — Free" button (via `POST /api/flags`), and the paid Stripe UI
+  is hidden. The payment code is fully retained, just bypassed.
+- **`FREE_MODE=false`** (or unset) — normal paid checkout (€0.70 via Stripe). The
+  free `POST /api/flags` endpoint returns 404 so flags can't be placed for free.
+
+Switching is a one-line env change with no redeploy of code logic.
 
 ## Architecture & security
 
