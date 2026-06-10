@@ -1,12 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { TEAMS } from "@/lib/teams";
 import { FlagImg } from "@/components/FlagImg";
+import { FlagBoard, type Cell } from "@/components/FlagBoard";
+import { GRID_COLS, GRID_ROWS } from "@/lib/grid";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCreatePaymentIntent } from "@workspace/api-client-react";
+import { useCreatePaymentIntent, getListFlagsQueryOptions } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Lock, CreditCard } from "lucide-react";
@@ -90,10 +93,15 @@ export default function Checkout() {
 
   const createIntent = useCreatePaymentIntent();
 
-  const [coords, setCoords] = useState(() => ({
-    x: Math.floor(Math.random() * 1800 + 100),
-    y: Math.floor(Math.random() * 1300 + 100),
+  // Live board so the player can see (and target) existing flags.
+  const { data: flags } = useQuery({ ...getListFlagsQueryOptions(), refetchInterval: 10_000 });
+
+  // The grid cell the player has chosen. Defaults to a random slot.
+  const [cell, setCell] = useState<Cell>(() => ({
+    col: Math.floor(Math.random() * GRID_COLS),
+    row: Math.floor(Math.random() * GRID_ROWS),
   }));
+  const coords = { x: cell.col, y: cell.row };
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
@@ -116,38 +124,9 @@ export default function Checkout() {
       .catch(() => setStripeConfig({ publishableKey: null, devMode: true }));
   }, []);
 
-  // Flag placement drag
-  const isDraggingFlag = useRef(false);
-  const [flagPos, setFlagPos] = useState({ x: 150, y: 130 });
-  const previewRef = useRef<HTMLDivElement>(null);
-
-  const applyMove = useCallback((clientX: number, clientY: number, rect: DOMRect) => {
-    const newX = Math.max(16, Math.min(rect.width - 32, clientX - rect.left));
-    const newY = Math.max(16, Math.min(rect.height - 32, clientY - rect.top));
-    setFlagPos({ x: newX, y: newY });
-    setCoords({
-      x: Math.round((newX / rect.width) * 2000),
-      y: Math.round((newY / rect.height) * 1500),
-    });
-  }, []);
-
-  const handleFlagMouseDown = (e: React.MouseEvent) => { e.preventDefault(); isDraggingFlag.current = true; };
-  const handlePreviewMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingFlag.current) return;
-    applyMove(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect());
-  };
-  const handlePreviewMouseUp = () => { isDraggingFlag.current = false; };
-  const handlePreviewTouchStart = () => { isDraggingFlag.current = true; };
-  const handlePreviewTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDraggingFlag.current || !previewRef.current) return;
-    e.preventDefault();
-    applyMove(e.touches[0].clientX, e.touches[0].clientY, previewRef.current.getBoundingClientRect());
-  };
-  const handlePreviewTouchEnd = () => { isDraggingFlag.current = false; };
-
   // Create the PaymentIntent only when the user commits to paying — not on page
   // load. This avoids abandoned intents from bounced visitors, and captures the
-  // final dragged flag position (not the position at mount time).
+  // chosen grid cell at confirm time.
   const startPayment = () => {
     if (!team || paymentIntentId || createIntent.isPending) return;
 
@@ -269,43 +248,28 @@ export default function Checkout() {
             </p>
           </div>
 
-          {/* Placement preview */}
+          {/* Slot picker — tap a cell to claim it (tap an occupied one to cover a rival) */}
           <Card className="bg-card/50 border-border/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
-                Placement Preview · <span className="text-primary">Drag the flag to choose your spot</span>
+                Pick Your Slot · <span className="text-primary">Tap a cell — tap a flag to cover it</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div
-                ref={previewRef}
-                className="relative bg-black/40 rounded-lg border border-white/5 overflow-hidden select-none touch-none"
-                style={{ height: 260 }}
-                onMouseMove={handlePreviewMouseMove}
-                onMouseUp={handlePreviewMouseUp}
-                onMouseLeave={handlePreviewMouseUp}
-                onTouchStart={handlePreviewTouchStart}
-                onTouchMove={handlePreviewTouchMove}
-                onTouchEnd={handlePreviewTouchEnd}
-              >
-                <div className="absolute inset-0 opacity-15" style={{ backgroundImage: 'linear-gradient(#2a4a2a 1px, transparent 1px), linear-gradient(90deg, #2a4a2a 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-                <div
-                  className="absolute cursor-grab active:cursor-grabbing"
-                  style={{ left: flagPos.x, top: flagPos.y, transform: "translate(-50%,-50%)" }}
-                  onMouseDown={handleFlagMouseDown}
-                >
-                  <FlagImg emoji={team.flag} size={56} alt={team.name} style={{ filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.9))", pointerEvents: "none" }} />
-                </div>
-                <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-muted-foreground uppercase tracking-widest pointer-events-none">
-                  Touch &amp; drag to position your flag
-                </div>
-              </div>
+              <FlagBoard
+                flags={flags ?? []}
+                height={260}
+                selectable
+                selectedCell={cell}
+                selectedTeamId={team.id}
+                onSelectCell={setCell}
+              />
             </CardContent>
           </Card>
 
           {/* Benefits */}
           <div className="space-y-2">
-            {["Your flag placed live on the global wall", "Visible to fans worldwide", "Permanent for the World Cup 2026"].map(txt => (
+            {["Claim a slot on the global wall", "Cover rivals' flags to take their spot", "Defend your territory all tournament"].map(txt => (
               <div key={txt} className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="text-primary">✓</span> {txt}
               </div>

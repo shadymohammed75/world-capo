@@ -3,6 +3,7 @@ import { rateLimit } from "express-rate-limit";
 import { db, paymentsTable, flagsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { VALID_TEAM_IDS } from "../lib/teams";
+import { GRID_COLS, GRID_ROWS, clampCell } from "../lib/grid";
 import { createHash } from "crypto";
 import {
   CreatePaymentIntentBody,
@@ -64,10 +65,10 @@ router.post("/payments/intent", paymentIntentLimiter, async (req, res): Promise<
     return;
   }
 
-  // The wall is a fixed 2000×1500 canvas — clamp so a crafted request can't
-  // place a flag off-screen.
-  const x = Math.min(2000, Math.max(0, parsed.data.x));
-  const y = Math.min(1500, Math.max(0, parsed.data.y));
+  // x/y are grid cell indices — clamp into the grid so a crafted request can't
+  // place a flag off the board.
+  const x = clampCell(parsed.data.x, GRID_COLS);
+  const y = clampCell(parsed.data.y, GRID_ROWS);
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "";

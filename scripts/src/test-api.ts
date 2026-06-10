@@ -146,23 +146,36 @@ await test("GET /payments/config returns publishableKey + devMode + freeMode", a
   assert(typeof body.freeMode === "boolean", `freeMode must be boolean`);
 });
 
-// ─── FREE-LAUNCH MODE ─────────────────────────────────────────
-await test("POST /flags places a flag for free when FREE_MODE on (else 404)", async () => {
-  const before = (await json(await fetch(`${BASE}/flags`))).length;
+// ─── FREE-LAUNCH MODE / GRID COVERING ─────────────────────────
+await test("POST /flags is disabled (404) when FREE_MODE is off", async () => {
+  if (freeMode) return "skip";
   const res = await fetch(`${BASE}/flags`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ teamId: "JPN", x: 1234, y: 567 }),
+    body: JSON.stringify({ teamId: "JPN", x: 1, y: 1 }),
   });
-  if (freeMode) {
-    assert(res.status === 200, `Expected 200 in free mode, got ${res.status}`);
-    const body = await json(res);
-    assert(body.success === true, `Expected success=true`);
-    const after = (await json(await fetch(`${BASE}/flags`))).length;
-    assert(after === before + 1, `Flag count should increase by 1 (${before} -> ${after})`);
-  } else {
-    assert(res.status === 404, `Expected 404 when free mode off, got ${res.status}`);
-  }
+  assert(res.status === 404, `Expected 404 when free mode off, got ${res.status}`);
+});
+
+await test("Placing on an occupied cell covers the previous flag (grid mechanic)", async () => {
+  if (!freeMode) return "skip";
+  const col = 40, row = 20;
+  const place = (teamId: string) => fetch(`${BASE}/flags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teamId, x: col, y: row }),
+  });
+  const at = (list: { teamId: string; x: number; y: number }[]) => list.find((f) => f.x === col && f.y === row);
+
+  assert((await place("KOR")).status === 200, "first placement should succeed");
+  let flags = await json(await fetch(`${BASE}/flags`));
+  const visibleAfterFirst = flags.length;
+  assert(at(flags)?.teamId === "KOR", "cell should show KOR after first placement");
+
+  assert((await place("JPN")).status === 200, "covering placement should succeed");
+  flags = await json(await fetch(`${BASE}/flags`));
+  assert(at(flags)?.teamId === "JPN", "cell should now show JPN (KOR covered)");
+  assert(flags.length === visibleAfterFirst, "covering must not add a new visible slot");
 });
 
 await test("POST /flags rejects unknown team", async () => {
@@ -181,7 +194,7 @@ await test("POST /payments/intent with valid teamId returns intentId + clientSec
   const res = await fetch(`${BASE}/payments/intent`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ teamId: "BRA", x: 500, y: 400 }),
+    body: JSON.stringify({ teamId: "BRA", x: 20, y: 15 }),
   });
   assert(res.status === 200, `Expected 200, got ${res.status}`);
   const body = await json(res);
@@ -210,15 +223,16 @@ await test("POST /payments/intent with unknown teamId returns 400", async () => 
 
 // confirm-mock only exists in dev mode; in live mode it must be disabled (404).
 if (devMode) {
-  await test("[dev] POST /payments/confirm-mock places a flag", async () => {
+  await test("[dev] POST /payments/confirm-mock places the flag on its cell", async () => {
     assert(intentId !== null, "No intentId from previous test");
-    const flagsBefore = await json(await fetch(`${BASE}/flags`));
     const res = await fetch(`${BASE}/payments/confirm-mock/${intentId}`, { method: "POST" });
     assert(res.status === 200, `Expected 200, got ${res.status}`);
     const body = await json(res);
     assert(body.success === true, `Expected success=true`);
-    const flagsAfter = await json(await fetch(`${BASE}/flags`));
-    assert(flagsAfter.length === flagsBefore.length + 1, `Flag count should increase by 1`);
+    // The intent was created for BRA at cell (20,15); that cell should now show BRA.
+    const flags = await json(await fetch(`${BASE}/flags`));
+    const here = (flags as { teamId: string; x: number; y: number }[]).find((f) => f.x === 20 && f.y === 15);
+    assert(here?.teamId === "BRA", `Cell (20,15) should show BRA, got ${JSON.stringify(here)}`);
   });
 
   await test("[dev] confirm-mock with fake id returns 404", async () => {

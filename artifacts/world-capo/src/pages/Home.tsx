@@ -1,10 +1,11 @@
-import { useState, useRef, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getListFlagsQueryOptions, getGetFlagCountsQueryOptions } from "@workspace/api-client-react";
 import { TEAMS } from "@/lib/teams";
 import { CookieConsent } from "@/components/CookieConsent";
 import { Footer } from "@/components/Footer";
 import { FlagImg } from "@/components/FlagImg";
+import { FlagBoard } from "@/components/FlagBoard";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -22,11 +23,6 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0 });
-  const lastTouch = useRef({ x: 0, y: 0 });
-
   const teamsWithCounts = useMemo(() => {
     return TEAMS.map(team => {
       const serverCount = counts?.find(c => c.teamId === team.id)?.count || 0;
@@ -36,32 +32,6 @@ export default function Home() {
 
   const totalPlaced = useMemo(() => teamsWithCounts.reduce((s, t) => s + t.totalCount, 0), [teamsWithCounts]);
   const leader = teamsWithCounts.find(t => t.totalCount > 0);
-
-  // Mouse drag
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-  };
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPan({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
-  };
-  const handleMouseUp = () => setIsDragging(false);
-
-  // Touch drag
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const t = e.touches[0];
-    setIsDragging(true);
-    lastTouch.current = { x: t.clientX, y: t.clientY };
-    dragStart.current = { x: t.clientX - pan.x, y: t.clientY - pan.y };
-  }, [pan]);
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    const t = e.touches[0];
-    setPan({ x: t.clientX - dragStart.current.x, y: t.clientY - dragStart.current.y });
-    lastTouch.current = { x: t.clientX, y: t.clientY };
-  }, []);
-  const handleTouchEnd = useCallback(() => setIsDragging(false), []);
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -139,67 +109,16 @@ export default function Home() {
         <div>
           <div className="flex items-center justify-between mb-3 gap-2">
             <h2 className="text-base sm:text-xl font-black uppercase tracking-wider">The Global Wall</h2>
-            <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">Touch to drag · Pick a nation below</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">Drag to explore · Cover rivals to win slots</span>
           </div>
 
-          <div
-            className="relative overflow-hidden rounded-xl border border-border/40 bg-[#0a0f0a] cursor-grab active:cursor-grabbing touch-none select-none"
-            style={{ height: 320 }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            <div
-              className="absolute inset-0 opacity-10 pointer-events-none"
-              style={{ backgroundImage: 'linear-gradient(#2a4a2a 1px, transparent 1px), linear-gradient(90deg, #2a4a2a 1px, transparent 1px)', backgroundSize: '40px 40px' }}
-            />
-            <div
-              className="absolute"
-              style={{
-                width: 2000,
-                height: 1500,
-                top: "50%",
-                left: "50%",
-                transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))`,
-              }}
-            >
-              {loadingFlags ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Loading Wall…</span>
-                </div>
-              ) : !flags?.length ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-muted-foreground text-sm uppercase tracking-widest">Be the first — hang your flag!</span>
-                </div>
-              ) : (
-                flags.map(flag => {
-                  const team = TEAMS.find(t => t.id === flag.teamId);
-                  if (!team) return null;
-                  return (
-                    <motion.div
-                      initial={{ scale: 0, rotate: -10 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      key={flag.id}
-                      className="absolute"
-                      style={{ left: flag.x, top: flag.y }}
-                      title={team.name}
-                    >
-                      <FlagImg emoji={team.flag} size={32} alt={team.name} style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.9))" }} />
-                    </motion.div>
-                  );
-                })
-              )}
+          {loadingFlags ? (
+            <div className="relative overflow-hidden rounded-xl border border-border/40 bg-[#0a0f0a] flex items-center justify-center" style={{ height: 320 }}>
+              <span className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Loading Wall…</span>
             </div>
-            <div className="absolute bottom-3 right-3 pointer-events-none">
-              <div className="bg-black/60 backdrop-blur px-2.5 py-1 rounded-full border border-white/10 text-[10px] text-muted-foreground uppercase tracking-widest">
-                Drag to explore
-              </div>
-            </div>
-          </div>
+          ) : (
+            <FlagBoard flags={flags ?? []} height={320} />
+          )}
         </div>
 
         {/* ── NATIONS GRID ──────────────────────────────────────────── */}
