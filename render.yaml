@@ -1,0 +1,29 @@
+# Render Blueprint — deploys the whole app as ONE free web service.
+# The Express API builds + serves the React frontend (single domain, no CORS).
+# Database is hosted separately on Neon (free) — set DATABASE_URL in the dashboard.
+#
+# Setup: Render Dashboard → New → Blueprint → connect this repo. Then fill in the
+# secret env vars (DATABASE_URL, ADMIN_PASSWORD) when prompted.
+services:
+  - type: web
+    name: worldcapo
+    runtime: node
+    plan: free
+    region: frankfurt
+    healthCheckPath: /api/healthz
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @workspace/world-capo build && pnpm --filter @workspace/api-server build
+    startCommand: node artifacts/api-server/dist/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FREE_MODE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATABASE_SSL
+        value: "true"
+      # Secrets — set these in the Render dashboard (not committed):
+      - key: DATABASE_URL      # Neon connection string (use the pooled URL)
+        sync: false
+      - key: ADMIN_PASSWORD    # strong password for /admin
+        sync: false

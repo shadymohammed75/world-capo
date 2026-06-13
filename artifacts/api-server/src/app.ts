@@ -1,4 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
@@ -19,7 +22,10 @@ if (trustProxy) {
 
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
 
-app.use(helmet());
+// CSP disabled because the SPA loads Google Fonts, Twemoji flag images, and
+// Stripe from CDNs; all other helmet protections (HSTS, X-Frame-Options,
+// nosniff, etc.) stay on.
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   cors({
     origin: allowedOrigin
@@ -54,7 +60,27 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
-// 404 — unmatched route
+// In production the API also serves the built frontend, so the whole app runs
+// as a single service on one domain (no CORS, no separate static host).
+const here = path.dirname(fileURLToPath(import.meta.url));
+const staticDir = process.env.STATIC_DIR
+  ? path.resolve(process.env.STATIC_DIR)
+  : path.resolve(here, "../../world-capo/dist/public");
+
+if (fs.existsSync(staticDir)) {
+  app.use(express.static(staticDir));
+  // SPA fallback — any non-API GET returns index.html for client-side routing.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== "GET" || req.path.startsWith("/api")) {
+      next();
+      return;
+    }
+    res.sendFile(path.join(staticDir, "index.html"));
+  });
+  logger.info({ staticDir }, "Serving static frontend");
+}
+
+// 404 — unmatched route (API paths, or anything when no static build is present)
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });

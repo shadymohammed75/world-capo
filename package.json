@@ -2,6 +2,7 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@11.5.2",
   "scripts": {
     "preinstall": "node -e \"if(!process.env.npm_config_user_agent||!process.env.npm_config_user_agent.startsWith('pnpm/')){process.stderr.write('Use pnpm instead\\n');process.exit(1)}\"",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",

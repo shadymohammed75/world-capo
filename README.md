@@ -133,6 +133,29 @@ Switching is a one-line env change with no redeploy of code logic.
 3. **Security** — set a strong `ADMIN_PASSWORD` and `ALLOWED_ORIGIN=https://yourdomain.com`.
 4. **Build & serve** — `pnpm run build`, then run the API (`node ./dist/index.mjs`) and serve the frontend's `dist/public` behind your reverse proxy / host.
 
+## Deploy to production (Render + Neon, free)
+
+The app deploys as **one** Render web service: the Express API serves the built
+React frontend, so everything runs on a single domain (no CORS, no separate
+static host). PostgreSQL is hosted free on Neon. See [render.yaml](render.yaml).
+
+1. **Database (Neon)** — create a free project at neon.tech, open the SQL editor,
+   and run [scripts/schema.sql](scripts/schema.sql) to create the tables. Copy the
+   **pooled** connection string.
+2. **App (Render)** — Dashboard → New → Blueprint → connect this repo. Render reads
+   `render.yaml`. When prompted, set the secret env vars:
+   - `DATABASE_URL` = the Neon pooled connection string
+   - `ADMIN_PASSWORD` = a strong password for `/admin`
+   (`NODE_ENV`, `FREE_MODE`, `TRUST_PROXY`, `DATABASE_SSL` are preset in the blueprint.)
+3. **Custom domain** — in the Render service → Settings → Custom Domains, add
+   `worldcapo.world` (and `www.worldcapo.world`), then add the DNS records Render
+   shows at your registrar. HTTPS is issued automatically.
+4. **(Optional) demo flags** — paste the `INSERT` from [scripts/seed-flags.sql](scripts/seed-flags.sql)
+   into Neon's SQL editor (replace `:n` with `300`) to launch with an active-looking wall.
+
+To switch from free to paid later, set `FREE_MODE=false` and add the Stripe env
+vars in the Render dashboard (see "Going live" below) — no redeploy of code needed.
+
 ## GDPR
 
 - Cookie consent banner on first visit (Essential Only vs Accept All)
