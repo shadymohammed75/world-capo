@@ -39,7 +39,7 @@ export default function Home() {
     const shareData = {
       title: "World Capo",
       text: "Help cover the World Cup 2026 wall with our flag! 🏴 Place yours, cover rivals, and push our nation to the top.",
-      url: typeof window !== "undefined" ? window.location.origin : "",
+      url: typeof window !== "undefined" ? `${window.location.origin}/?utm_source=share` : "",
     };
     try {
       if (navigator.share) {
