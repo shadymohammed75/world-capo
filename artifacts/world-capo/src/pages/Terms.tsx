@@ -74,12 +74,6 @@ export default function Terms() {
         We may update these Terms from time to time. Continued use of the Service after changes take
         effect constitutes acceptance of the revised Terms.
       </p>
-
-      <h2>10. Governing law &amp; contact</h2>
-      <p>
-        These Terms are governed by the laws of {SITE.jurisdiction}. For any question about these Terms,
-        contact us at <a href={`mailto:${SITE.contactEmail}`}>{SITE.contactEmail}</a>.
-      </p>
     </LegalLayout>
   );
 }
