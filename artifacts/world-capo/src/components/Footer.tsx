@@ -21,9 +21,6 @@ export function Footer() {
           <Link href="/terms" className="hover:text-foreground transition-colors">
             Terms
           </Link>
-          <a href={`mailto:${SITE.contactEmail}`} className="hover:text-foreground transition-colors">
-            Contact
-          </a>
         </nav>
       </div>
     </footer>
