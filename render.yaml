@@ -11,9 +11,13 @@ services:
     plan: free
     region: frankfurt
     healthCheckPath: /api/healthz
-    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @workspace/world-capo build && pnpm --filter @workspace/api-server build
+    # Run pnpm THROUGH corepack (no `corepack enable`, which fails on Render's
+    # read-only /usr/bin). Version comes from package.json "packageManager".
+    buildCommand: corepack pnpm install --no-frozen-lockfile && corepack pnpm --filter @workspace/world-capo build && corepack pnpm --filter @workspace/api-server build
     startCommand: node artifacts/api-server/dist/index.mjs
     envVars:
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
       - key: NODE_ENV
         value: production
       - key: FREE_MODE
